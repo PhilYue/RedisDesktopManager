@@ -1,4 +1,4 @@
-import QtQuick 2.3
+import QtQuick 2.15
 import QtQuick.Layouts 1.1
 import QtQuick.Controls 2.13
 import QtQuick.Controls 1.4 as LC
@@ -18,7 +18,7 @@ Dialog {
     contentItem: Rectangle {
         id: dialogRoot
         implicitWidth: 800
-        implicitHeight: PlatformUtils.isOSX()? 500 : 680
+        implicitHeight: PlatformUtils.isOSX() && qmlUtils.isAppStoreBuild()? 550 : 750
 
         color: sysPalette.base
 
@@ -30,20 +30,21 @@ Dialog {
             ScrollView {
                 id: globalSettingsScrollView
                 width: parent.width
-                height: parent.height                
+                height: parent.height
                 ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
                 ColumnLayout {
                     id: innerLayout
                     width: PlatformUtils.isOSX()? globalSettingsScrollView.width - 25 : globalSettingsScrollView.width
                     height: (dialogRoot.height - 50 > implicitHeight) ? dialogRoot.height - 50 : implicitHeight
+                    spacing: 8
 
                     SettingsGroupTitle {
                         text: qsTranslate("RDM","General")
                     }
 
-                    Label {
-                        color: "grey"
+                    BetterLabel {
+                        color: disabledSysPalette.text
                         text: qsTranslate("RDM","Application will be restarted to apply this setting.")
                     }
 
@@ -65,9 +66,8 @@ Dialog {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 30
 
-                        value: Qt.platform.os == "osx"? "Helvetica Neue" : "Open Sans"
                         model: Qt.fontFamilies()
-                        label: qsTranslate("RDM","Font")                        
+                        label: qsTranslate("RDM","Font")
 
                         onValueChanged: root.restartRequired = true
                     }
@@ -79,8 +79,19 @@ Dialog {
                         Layout.preferredHeight: 30
 
                         model: ["8", "9", "10", "11", "12", "13", "14", "15", "16"]
-                        value: Qt.platform.os == "osx"? "12" : "11"
-                        label: qsTranslate("RDM","Font Size")                        
+                        label: qsTranslate("RDM","Font Size")
+
+                        onValueChanged: root.restartRequired = true
+                    }
+
+                    ComboboxOption {
+                        id: valueEditorFont
+
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 30
+
+                        model: Qt.fontFamilies()
+                        label: qsTranslate("RDM","Value Editor Font")
 
                         onValueChanged: root.restartRequired = true
                     }
@@ -93,9 +104,22 @@ Dialog {
 
                         model: ["8", "9", "10", "11", "12", "13", "14", "15", "16"]
                         value: Qt.platform.os == "osx"? "12" : "11"
-                        label: qsTranslate("RDM","Value Editor Font Size")                        
+                        label: qsTranslate("RDM","Value Editor Font Size")
 
                         onValueChanged: root.restartRequired = true
+                    }
+
+                    IntOption {
+                        id: valueSizeLimit
+
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 30
+
+                        min: 1
+                        max: 2000000
+                        value: 150000
+                        label: qsTranslate("RDM","Maximum Formatted Value Size")
+                        description: qsTranslate("RDM", "Size in bytes")
                     }
 
                     BoolOption {
@@ -105,7 +129,7 @@ Dialog {
                         Layout.preferredHeight: 30
 
                         value: false
-                        label: qsTranslate("RDM","Use system proxy settings")                        
+                        label: qsTranslate("RDM","Use system proxy settings")
 
                         onValueChanged: root.restartRequired = true
                     }
@@ -164,22 +188,24 @@ Dialog {
                     }
 
                     SettingsGroupTitle {
-                        visible: !PlatformUtils.isOSX()
+                        visible: !(PlatformUtils.isOSX() && qmlUtils.isAppStoreBuild())
                         text: qsTranslate("RDM","External Value View Formatters")
                     }
 
                     Text {
-                        visible: !PlatformUtils.isOSX()
+                        visible: !(PlatformUtils.isOSX() && qmlUtils.isAppStoreBuild())
                         text: formattersManager? qsTranslate("RDM","Formatters path: %0").arg(formattersManager.formattersPath()) : ""
                         font.pixelSize: 12
                         color: "grey"
                     }
 
                     LC.TableView {
-                        visible: !PlatformUtils.isOSX()
+                        id: formattersTable
+                        visible: !(PlatformUtils.isOSX() && qmlUtils.isAppStoreBuild())
 
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+                        Layout.preferredHeight: 100
                         verticalScrollBarPolicy: Qt.ScrollBarAlwaysOn
 
                         LC.TableViewColumn {
@@ -206,6 +232,7 @@ Dialog {
                     }
 
                     Item {
+                        visible: !formattersTable.visible
                         Layout.fillHeight: true
                     }
 
@@ -245,7 +272,9 @@ Dialog {
         property alias liveUpdateInterval: liveUpdateInterval.value
         property alias appFont: appFont.value
         property alias appFontSize: appFontSize.value
+        property alias valueEditorFont: valueEditorFont.value
         property alias valueEditorFontSize: valueEditorFontSize.value
+        property alias valueSizeLimit: valueSizeLimit.value
         property alias locale: appLang.value
         property alias useSystemProxy: systemProxy.value
     }

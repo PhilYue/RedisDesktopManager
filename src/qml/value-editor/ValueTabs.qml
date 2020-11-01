@@ -23,10 +23,27 @@ Repeater {
                 icon.source: "qrc:/images/key.svg"
 
                 text: tabName
-                ToolTip.text: keyModel && tabName <= keyName? keyName : ""
+                tooltip: keyModel && tabName <= keyName? keyName : ""
 
                 onCloseClicked: {
-                    valuesModel.closeTab(keyIndex)
+                    if (valueEditor.item && valueEditor.item.isEdited() && keyType != "stream") {
+                        closeConfirmation.open()
+                    } else {
+                        valuesModel.closeTab(keyIndex)
+                    }
+                }
+
+                BetterMessageDialog {
+                    id: closeConfirmation
+                    title: qsTranslate("RDM","Changes are not saved")
+                    text: qsTranslate("RDM","Do you want to close key tab without saving changes?")
+
+                    modality: Qt.WindowModal
+                    visible: false
+
+                    onYesClicked: {
+                        valuesModel.closeTab(keyIndex)
+                    }
                 }
             }
         }
@@ -56,14 +73,14 @@ Repeater {
         property Component searchModelComponent: Component {
             SortFilterProxyModel {
                 source: keyViewModel
-                //sortOrder: table.sortIndicatorOrder
+                sortOrder: Qt.AscendingOrder
                 sortCaseSensitivity: Qt.CaseInsensitive
-                sortRole: keyTab.keyModel && keyTab.keyModel.isLoaded ? "value" : ""
+                sortRole: keyTab.keyModel && keyTab.keyModel.isLoaded ? "row" : ""
 
                 filterString: table.searchField.text
                 filterSyntax: SortFilterProxyModel.Wildcard
                 filterCaseSensitivity: Qt.CaseInsensitive
-                filterRole: keyTab.keyModel && keyTab.keyModel.isLoaded ? "value" : ""
+                filterKeyColumn: -1
 
                 onFilterStringChanged: {
                     table.resetCurrentRow()
@@ -133,8 +150,8 @@ Repeater {
                     Layout.fillWidth: true
                     spacing: 5
 
-                    Label {
-                        Layout.preferredWidth: 70
+                    BetterLabel {
+                        Layout.preferredWidth: isMultiRow ? 70 : 90
                         text: keyModel? keyType.toUpperCase() + ":" : "";
                         font.bold: true
                     }
@@ -144,7 +161,7 @@ Repeater {
                         Layout.fillWidth: true
                         text: keyModel? keyName : ""
                         readOnly: true
-                        objectName: "rdm_key_name_field"                                               
+                        objectName: "rdm_key_name_field"
                     }
 
                     BetterButton {
@@ -159,14 +176,14 @@ Repeater {
                             id: renameConfirmation
                             title: qsTranslate("RDM","Rename key")
 
-                            width: 520                                                      
+                            width: 520
 
                             RowLayout {
                                 implicitWidth: 500
                                 implicitHeight: 100
                                 width: 500
 
-                                Label { text: qsTranslate("RDM","New name:") }
+                                BetterLabel { text: qsTranslate("RDM","New name:") }
                                 BetterTextField {
                                     id: newKeyName;
                                     Layout.fillWidth: true;
@@ -184,11 +201,10 @@ Repeater {
                             }
 
                             visible: false
-                            standardButtons: Dialog.Ok | Dialog.Cancel
                         }
                     }
 
-                    Label {
+                    BetterLabel {
                         visible: keyType === "hyperloglog";
                         text:  qsTranslate("RDM","Size: ") + keyRowsCount
                     }
@@ -210,12 +226,33 @@ Repeater {
                                 implicitHeight: 100
                                 width: 500
 
-                                Label { text: qsTranslate("RDM","New TTL:") }
+                                BetterLabel { text: qsTranslate("RDM","New TTL:") }
                                 BetterTextField {
                                     id: newTTL;
                                     Layout.fillWidth: true;
                                     objectName: "rdm_set_ttl_key_field"
                                     inputMethodHints: Qt.ImhDigitsOnly
+                                    validator: IntValidator{bottom: 1}
+                                }
+                            }
+
+                            footer: BetterDialogButtonBox {
+                                BetterButton {
+                                    text: qsTranslate("RDM","Save")
+                                    DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+                                }
+
+                                BetterButton {
+                                    text: qsTranslate("RDM","Persist key")
+                                    onClicked: {
+                                        keyTab.keyModel.persistKey()
+                                        setTTLConfirmation.close()
+                                    }
+                                }
+
+                                BetterButton {
+                                    text: qsTranslate("RDM","Cancel")
+                                    onClicked: setTTLConfirmation.close()
                                 }
                             }
 
@@ -227,12 +264,16 @@ Repeater {
                                 keyTab.keyModel.setTTL(newTTL.text)
                             }
 
-                            visible: false                            
-                            standardButtons: Dialog.Ok | Dialog.Cancel
+                            visible: false
                         }
 
                         onClicked: {
-                            newTTL.text = ""+keyTtl
+                            if (keyTtl > 0) {
+                                newTTL.text = ""+keyTtl
+                            } else {
+                                newTTL.text = ""
+                            }
+
                             setTTLConfirmation.open()
                         }
                     }
@@ -267,7 +308,7 @@ Repeater {
                     }
                 }
 
-                SplitView {
+                BetterSplitView {
                     orientation: Qt.Vertical
                     Layout.fillHeight: true
                     Layout.fillWidth: true
@@ -294,20 +335,48 @@ Repeater {
                                 spacing: 1
 
                                 Repeater {
+                                    id: tableHeader
                                     model: keyTab.keyModel? keyTab.keyModel.columnNames : []
 
-                                    Rectangle {
+                                    Rectangle {  // Table header cell
                                         Layout.preferredHeight: 30
                                         Layout.preferredWidth: 75
                                         Layout.fillWidth: index !== 0
                                         color: sysPalette.window
 
-                                        Label {
+                                        BetterLabel {
                                             anchors.centerIn: parent
                                             text: modelData
                                             color: sysPalette.windowText
                                         }
-                                    }
+
+                                        BetterLabel {  // Sort indicator
+                                            anchors.margins: 10
+                                            anchors.right: parent.right
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            font.pointSize: 8
+                                            text: "▲"
+                                            color: sysPalette.mid
+                                            visible: false
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+
+                                            onClicked: {
+                                                var role = tableHeader.model[index]
+                                                var order = (role == table.model.sortRole) ? 1 - table.model.sortOrder : Qt.AscendingOrder
+
+                                                for (var i = 0; i < tableHeader.model.length; i++) {
+                                                    tableHeader.itemAt(i).children[1].visible = false
+                                                }
+                                                tableHeader.itemAt(index).children[1].text = (order === Qt.AscendingOrder) ? "▲" : "▼"
+                                                tableHeader.itemAt(index).children[1].visible = true
+
+                                                table.sort(role, order)
+                                            }
+                                        }
+                                    }  // Table header cell end
                                 }
                             }
 
@@ -317,17 +386,21 @@ Repeater {
                                 Layout.minimumHeight: 100
 
                                 ScrollView {
+                                    id: tableScrollView
                                     anchors.fill: parent
 
                                     ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-                                    ScrollBar.vertical.policy: ScrollBar.AlwaysOn
+                                    ScrollBar.vertical.policy: ScrollBar.AlwaysOn                                    
+
 
                                     TableView {
                                         id: table
                                         objectName: "rdm_value_tab_table"
 
+                                        focus: true
+
                                         width: parent.width
-                                        onWidthChanged: forceLayout() 
+                                        onWidthChanged: forceLayout()
                                         clip: true
                                         columnSpacing: 1
                                         rowSpacing: 1
@@ -355,9 +428,12 @@ Repeater {
                                                     objectName: "rdm_value_table_cell_col1"
                                                     implicitWidth: table.firstColumnWidth
                                                     implicitHeight: 30
-                                                    text: Number(display) + 1
+                                                    text: Number(row) + 1
                                                     selected: table.currentRow === row
-                                                    onClicked: table.currentRow = row                                                  
+                                                    onClicked: {
+                                                        table.currentRow = row
+                                                        table.forceActiveFocus()
+                                                    }
                                                 }
                                             }
 
@@ -370,7 +446,10 @@ Repeater {
                                                     implicitHeight: 30
                                                     text: renderText(display)
                                                     selected: table.currentRow === row
-                                                    onClicked: table.currentRow = row
+                                                    onClicked: {
+                                                        table.currentRow = row
+                                                        table.forceActiveFocus()
+                                                    }
                                                 }
                                             }
 
@@ -383,15 +462,18 @@ Repeater {
                                                     implicitHeight: 30
 
                                                     selected: table.currentRow === row
-                                                    onClicked: table.currentRow = row
+                                                    onClicked: {
+                                                        table.currentRow = row
+                                                        table.forceActiveFocus()
+                                                    }
 
                                                     text: {
                                                         if (display === "" || !isMultiRow) {
                                                             return ""
                                                         }
 
-                                                        if (keyType == "zset") {
-                                                            return parseFloat(Number(display).toFixed(20))
+                                                        if (keyType == "zset") {                                                            
+                                                            return Number(display)
                                                         }
 
                                                         return renderText(display)
@@ -402,7 +484,7 @@ Repeater {
 
                                         OkDialog {
                                             id: valueErrorNotification
-                                            visible: false                                                                                                                                    
+                                            visible: false
                                         }
 
                                         Connections {
@@ -494,6 +576,11 @@ Repeater {
                                             table.currentRow = -1
                                         }
 
+                                        function sort(role, order) {
+                                            table.model.setSortRole(role)
+                                            table.model.setSortOrder(order)
+                                        }
+
                                         onRowsChanged: wrapper.hideLoader()
                                         onCurrentRowChanged: {
                                             console.log("Current row in table changed: ", currentRow)
@@ -501,7 +588,7 @@ Repeater {
                                                 valueEditor.loadRowValue(currentRow)
                                             }
                                         }
-                                    }
+                                    }                                    
                                 }
                             }
                         }
@@ -528,7 +615,7 @@ Repeater {
                                                                     : qsTranslate("RDM","Add Row")
 
                                     width: 550
-                                    height: 400                                    
+                                    height: 400
 
                                     contentItem: Rectangle {
                                         color: sysPalette.base
@@ -559,7 +646,7 @@ Repeater {
                                     }
 
                                     footer: BetterDialogButtonBox {
-                                        Button {
+                                        BetterButton {
                                             DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
                                             objectName: "rdb_add_row_dialog_add_button"
                                             text: qsTranslate("RDM","Add")
@@ -584,7 +671,7 @@ Repeater {
                                             }
                                         }
 
-                                        Button {
+                                        BetterButton {
                                             text: qsTranslate("RDM", "Cancel")
                                             DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
                                         }
@@ -606,7 +693,7 @@ Repeater {
                                         deleteRowConfirmation.text = qsTranslate("RDM","The row is the last one in the key. After removing it key will be deleted.")
                                     } else {
                                         deleteRowConfirmation.text = qsTranslate("RDM","Do you really want to remove this row?")
-                                    }                                   
+                                    }
 
                                     console.log("removing row", table.currentRow)
 
@@ -716,7 +803,7 @@ Repeater {
                     }
                     // Table end
 
-                    //Value editor
+                    // Value editor
                     ColumnLayout {
                         id: editorWrapper
                         SplitView.fillWidth: true
@@ -754,65 +841,19 @@ Repeater {
                             function clear() {
                                 if (valueEditor.item) {
                                     currentRow = -1
+
+                                    if (valueEditor.item.keyType !== undefined) {
+                                        valueEditor.item.keyType = keyType
+                                    }
+
                                     valueEditor.item.reset()
                                 }
                             }
 
                             onLoaded: clear()
                         }
-
-                        RowLayout {
-                            id: editorButtonsRow
-                            Layout.fillWidth: true
-                            Layout.minimumHeight: 30
-                            Item { Layout.fillWidth: true}
-
-                            BetterButton {
-                                visible: keyType === "hyperloglog"
-                                Layout.preferredWidth: 195
-                                text: qsTranslate("RDM","Add Element to HLL");
-                                iconSource: "qrc:/images/add.svg"
-                                onClicked: {
-                                    addRowDialog.open()
-                                }
-                            }
-
-                            BetterButton {
-                                text: qsTranslate("RDM","Save")
-
-                                objectName: "rdm_value_editor_save_btn"
-
-                                enabled: keyType != "stream"
-
-                                onClicked: {
-                                    if (!valueEditor.item || !valueEditor.item.isEdited()) {
-                                        savingConfirmation.text = qsTranslate("RDM","Nothing to save")
-                                        savingConfirmation.open()
-                                        return
-                                    }
-
-                                    valueEditor.item.validateValue(function (result){
-                                        if (!result)
-                                            return;
-
-                                        var value = valueEditor.item.getValue()
-                                        keyTab.keyModel.updateRow(valueEditor.currentRow, value)
-
-                                        savingConfirmation.text = qsTranslate("RDM","Value was updated!")
-                                        savingConfirmation.open()
-                                    })
-                                }
-                            }
-
-                            OkDialog {
-                                id: savingConfirmation
-                                title: qsTranslate("RDM","Save value")
-                                text: ""
-                                visible: false                                                                                                
-                            }
-                        }
                     }
-                    //Value editor end
+                    // Value editor end
                 }
             }
 
@@ -830,7 +871,7 @@ Repeater {
 
                         BusyIndicator { Layout.alignment: Qt.AlignHCenter;  running: true }
 
-                        Label {
+                        BetterLabel {
                             visible: loadingModel
                             text: tabName
                         }
@@ -844,4 +885,3 @@ Repeater {
         }
     }
 }
-

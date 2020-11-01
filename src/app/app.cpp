@@ -103,8 +103,19 @@ void Application::initModels() {
   connect(m_events.data(), &Events::openConsole, m_consoleModel.data(),
           &TabViewModel::openTab);
 
+  auto srvStatsFactory = [this](QSharedPointer<RedisClient::Connection> c,
+                                int dbIndex, QList<QByteArray> initCmd) {
+    auto rawModelPtr = new ServerStats::Model(c, dbIndex, initCmd);
+    auto model = QSharedPointer<TabModel>(rawModelPtr, &QObject::deleteLater);
+
+    QObject::connect(rawModelPtr, &ServerStats::Model::openConsoleTerminal,
+                     m_events.data(), &Events::openConsole);
+
+    return model;
+  };
+
   m_serverStatsModel = QSharedPointer<TabViewModel>(
-      new TabViewModel(getTabModelFactory<ServerStats::Model>()));
+      new TabViewModel(srvStatsFactory));
 
   connect(m_events.data(), &Events::openServerStats, this,
           [this](QSharedPointer<RedisClient::Connection> c) {
@@ -118,7 +129,8 @@ void Application::initModels() {
   connect(m_formattersManager.data(),
           &ValueEditor::ExternalFormattersManager::error, this,
           [this](const QString& msg) {
-            m_events->log(QString("Formatters: %1").arg(msg));
+            qDebug() << "External formatters:" << msg;
+            m_events->log(QString("External: %1").arg(msg));
           });
 
   if (!m_formattersDir.isEmpty()) {
@@ -153,18 +165,22 @@ void Application::initAppFonts() {
   QSettings settings;
 #ifdef Q_OS_MAC
   QString defaultFontName("Helvetica Neue");
+  QString defaultMonospacedFont("Monaco");
   int defaultFontSize = 12;
 #elif defined(Q_OS_WINDOWS)
   QString defaultFontName("Segoe UI");
+  QString defaultMonospacedFont("Consolas");
   int defaultFontSize = 11;
 #else
   QString defaultFontName("Open Sans");
-  int defaultFontSize = 11;
+  QString defaultMonospacedFont("Ubuntu Mono");
+  int defaultFontSize = 11;  
 #endif
+
+  int defaultValueSizeLimit = 150000;
 
   QString appFont = settings.value("app/appFont", defaultFontName).toString();
   int appFontSize = settings.value("app/appFontSize", defaultFontSize).toInt();
-
 
   if (appFont == "Open Sans") {
 #if defined(Q_OS_LINUX)
@@ -178,7 +194,18 @@ void Application::initAppFonts() {
 #endif
   }
 
+  QString valuesFont = settings.value("app/valueEditorFont", defaultMonospacedFont).toString();
+  int valuesFontSize = settings.value("app/valueEditorFontSize", defaultFontSize).toInt();
+  int valueSizeLimit = settings.value("app/valueSizeLimit", defaultValueSizeLimit).toInt();
+
+  settings.setValue("app/appFont", appFont);
+  settings.setValue("app/appFontSize", appFontSize);
+  settings.setValue("app/valueEditorFont", valuesFont);
+  settings.setValue("app/valueEditorFontSize", valuesFontSize);
+  settings.setValue("app/valueSizeLimit", valueSizeLimit);
+
   qDebug() << "App font:" << appFont << appFontSize;
+  qDebug() << "Values font:" << valuesFont;
   QFont defaultFont(appFont, appFontSize);
   QApplication::setFont(defaultFont);
 }
@@ -300,8 +327,7 @@ void Application::processCmdArgs() {
 #ifdef Q_OS_WIN32
       QString("%1/formatters").arg(QCoreApplication::applicationDirPath()));
 #elif defined Q_OS_MACOS
-      QString("%1/../Resources/formatters")
-          .arg(QCoreApplication::applicationDirPath()));
+      QString("%1/.rdm/formatters").arg(QDir::homePath()));
 #else
       QString());
 #endif
@@ -326,7 +352,7 @@ void Application::OnNewUpdateAvailable(QString& url) {
   QMessageBox::information(
       nullptr, "New update available",
       QCoreApplication::translate(
-          "RDM", "Please download new version of Redis Desktop Manager: %1")
+          "RDM", "Please download new version of RDM: %1")
               .arg(url));
 }
 

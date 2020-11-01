@@ -4,27 +4,29 @@ import QtQuick.Controls 2.13
 import "../common"
 
 ColumnLayout {    
-    RowLayout {
+    GridLayout {
+        columns: 3
         Layout.fillWidth: true
 
-        Label {
+        BetterLabel {
             text: qsTranslate("RDM","Page") + " "
             wrapMode: Text.WrapAnywhere
         }
 
-        Label {
+        BetterLabel {
             id: pageField;
             text: table.currentPage;
             Layout.maximumWidth: 60;
         }
 
-        Label {
+        BetterLabel {
             Layout.maximumWidth: 130
             text: " of " + table.totalPages
             wrapMode: Text.WrapAnywhere
         }
 
-        Label {
+        BetterLabel {
+            Layout.columnSpan: 3
             text:  qsTranslate("RDM","Size: ") + keyRowsCount
         }
     }
@@ -35,12 +37,14 @@ ColumnLayout {
         spacing: 1
         BetterButton {
             Layout.fillWidth: true
-            text: "⇦"
+            palette.buttonText: sysPalette.dark
+            text: "❮"
             onClicked: table.goToPrevPage()
         }
         BetterButton {
             Layout.fillWidth: true
-            text: "⇨"
+            palette.buttonText: sysPalette.dark
+            text: "❯"
             onClicked: table.goToNextPage()
             objectName: "rdm_value_editor_next_page_button"
         }

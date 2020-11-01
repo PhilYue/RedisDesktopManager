@@ -1,24 +1,17 @@
-import QtQuick 2.0
+import QtQuick 2.13
 import QtQuick.Controls 2.13
 
 ComboBox {
     id: root
     implicitHeight: 30
 
-    palette.windowText: sysPalette.text
+    palette.base: sysPalette.base
+    palette.button: sysPalette.button
+    palette.text: sysPalette.text
     palette.buttonText: sysPalette.text
-    palette.highlightedText: sysPalette.text
+    palette.highlightedText: sysPalette.buttonText
     palette.highlight: sysPalette.highlight
-
-    Connections {
-        target: approot
-
-        onPaletteChanged: {
-            root.palette = approot.palette
-            root.palette.windowText = sysPalette.text
-            root.palette.buttonText = sysPalette.text
-            root.palette.highlightedText = sysPalette.text
-            root.palette.highlight = sysPalette.highlight
-        }
-    }
+    palette.mid: sysPalette.mid
+    palette.dark: sysPalette.dark
+    palette.window: sysPalette.window
 }

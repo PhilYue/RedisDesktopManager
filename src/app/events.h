@@ -26,7 +26,7 @@ class Events : public QObject, public QEnableSharedFromThis<Events> {
                     bool inNewTab);
 
   void openConsole(QSharedPointer<RedisClient::Connection> connection,
-                   int dbIndex);
+                   int dbIndex, QList<QByteArray> initCmd = QList<QByteArray>());
 
   void openServerStats(QSharedPointer<RedisClient::Connection> connection);
 
@@ -44,9 +44,6 @@ class Events : public QObject, public QEnableSharedFromThis<Events> {
   void newKeyDialog(QSharedPointer<RedisClient::Connection> connection,
                     std::function<void()> callback, int dbIndex,
                     QString keyPrefix);
-
-  // Connections
-  void createNewConnection(RedisClient::ConnectionConfig config);
 
   // Notifications
   void error(const QString& msg);

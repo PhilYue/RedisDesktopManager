@@ -20,11 +20,11 @@ ApplicationWindow {
     id: approot
     visible: true
     objectName: "rdm_qml_root"
-    title: "Redis Desktop Manager " + Qt.application.version
+    title: "RDM - GUI for Redis® " + Qt.application.version
     width: 1100
     height: 800
     minimumWidth: 1100
-    minimumHeight: 700
+    minimumHeight: 650
 
     property double wRatio : (width * 1.0) / (Screen.width * 1.0)
     property double hRatio : (height * 1.0) / (Screen.height * 1.0)
@@ -38,6 +38,7 @@ ApplicationWindow {
         Component.onCompleted: {
             loadEmbeddedFormatters();
             loadExternalFormatters();
+            updateRWFormatters();
         }
     }
 
@@ -52,15 +53,6 @@ ApplicationWindow {
         if (Qt.platform.os == "windows") {
             x = Screen.width / 2 - width / 2
             y = Screen.height / 2 - height / 2
-        }
-
-        if (Qt.platform.os == "osx") {
-            // Qt BUG: https://bugreports.qt.io/browse/QTBUG-63829
-            flags = Qt.Window | Qt.WindowFullscreenButtonHint
-                    | Qt.WindowTitleHint | Qt.WindowSystemMenuHint
-                    | Qt.WindowMinMaxButtonsHint
-                    | Qt.WindowCloseButtonHint
-                    | Qt.WindowFullscreenButtonHint;
         }
 
         appSplitView.restoreState(windowSettings.splitView)
@@ -79,7 +71,9 @@ ApplicationWindow {
     Settings {
         id: appSettings
         category: "app"
+        property string valueEditorFont
         property string valueEditorFontSize
+        property int valueSizeLimit: 150000
     }
 
     SystemPalette {
@@ -89,7 +83,11 @@ ApplicationWindow {
     SystemPalette {
         id: inactiveSysPalette
         colorGroup: SystemPalette.Inactive
+    }
 
+    SystemPalette {
+        id: disabledSysPalette
+        colorGroup: SystemPalette.Disabled
     }
 
     QuickStartDialog {
@@ -121,14 +119,29 @@ ApplicationWindow {
         onSaveConnection: connectionsManager.updateConnection(settings)
     }
 
+    ConnectionGroupDialog {
+        id: connectionGroupDialog
+
+        objectName: "rdm_connection_group_dialog"
+
+        onAddNewGroup: {
+            connectionsManager.addNewGroup(name)
+        }
+
+        onEditGroup: {
+            connectionsManager.updateGroup(group)
+        }
+    }
+
     OkDialog {
         id: notification
         objectName: "rdm_qml_error_dialog"
         visible: false
 
-        function showError(msg) {
+        function showError(msg, details="") {
             icon = StandardIcon.Warning
             text = msg
+            detailedText = details
             open()
         }
 
@@ -187,6 +200,11 @@ ApplicationWindow {
             connectionSettingsDialog.open()
         }
 
+        onEditConnectionGroup: {
+            connectionGroupDialog.group = group
+            connectionGroupDialog.open()
+        }
+
         Component.onCompleted: {
             if (connectionsManager.size() == 0)
                 quickStartDialog.open()
@@ -207,12 +225,75 @@ ApplicationWindow {
         anchors.topMargin: 1
         orientation: Qt.Horizontal
 
-        BetterTreeView {
-            id: connectionsTree
+        ColumnLayout {
             SplitView.fillHeight: true
             SplitView.minimumWidth: 404
             SplitView.minimumHeight: 500
-        }      
+
+            BetterTreeView {
+                id: connectionsTree
+
+                Layout.fillHeight: true
+                Layout.fillWidth: true
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.margins: 10
+
+                BetterButton {
+                    id: addConnectionGroupBtn
+                    iconSource: "qrc:/images/add.svg"
+                    text: qsTranslate("RDM", "Add Group")
+
+                    Layout.fillWidth: true
+
+                    visible: sortButton.visible
+
+                    onClicked: {
+                        connectionGroupDialog.group = undefined
+                        connectionGroupDialog.open()
+                    }
+                }
+
+                BetterButton {
+                    id: sortButton
+                    text: qsTranslate("RDM", "Regroup connections")
+
+                    iconSource: "qrc:/images/sort.svg"
+
+                    Layout.fillWidth: true
+
+                    onClicked: {
+                        connectionsTree.sortConnections = true
+                        connectionsTree.selection.clear()
+                        connectionsTree.backgroundVisible = true
+
+                        connectionsManager.collapseRootItems()
+
+                        sortButton.visible = false
+                    }
+                }
+
+                BetterButton {
+                    id: sortApplyButton
+
+                    Layout.fillWidth: true
+
+                    text: qsTranslate("RDM", "Exit Regroup Mode")
+                    visible: !sortButton.visible
+
+                    iconSource: "qrc:/images/ok.svg"
+
+                    onClicked: {
+                        connectionsTree.sortConnections = false
+                        connectionsTree.backgroundVisible = false
+                        connectionsManager.applyGroupChanges()
+                        sortButton.visible = true
+                    }
+                }
+            }
+        }
 
         ColumnLayout {
             SplitView.fillWidth: true
@@ -334,6 +415,10 @@ ApplicationWindow {
         height: approot.height
         position: 0.3
         edge: Qt.LeftEdge
+        background: Rectangle {
+            color: sysPalette.base
+            border.color: sysPalette.mid
+        }
 
         LogView {
             anchors.fill: parent

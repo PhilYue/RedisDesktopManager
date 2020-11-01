@@ -14,7 +14,7 @@ Dialog {
 
     property bool isNewConnection: !settings || !settings.name
     property var settings
-    property string quickStartGuideUrl: "http://docs.redisdesktop.com/en/latest/quick-start/"
+    property string quickStartGuideUrl: "http://docs.rdm.dev/en/latest/quick-start/"
 
     signal testConnection
     signal saveConnection(var settings)
@@ -121,6 +121,12 @@ Dialog {
                     id: connectionSettingsTabBar
                     Layout.fillWidth: true
 
+                    palette.brightText: sysPalette.text
+                    palette.dark: sysPalette.button
+                    palette.mid: sysPalette.window
+                    palette.window: sysPalette.base
+                    palette.windowText: sysPalette.windowText
+
                     TabButton {
                         objectName: "rdm_connection_settings_dialog_basic_settings_tab"
                         text: qsTranslate("RDM","Connection Settings")
@@ -151,11 +157,12 @@ Dialog {
                             anchors.margins: 10
 
                             GridLayout {
+                                objectName: "rdm_connection_basic_settings"
                                 columns: 2
 
                                 Layout.fillWidth: true
 
-                                Label { text: qsTranslate("RDM","Name:") }
+                                BetterLabel { text: qsTranslate("RDM","Name:") }
 
                                 BetterTextField {
                                     id: connectionName
@@ -167,10 +174,11 @@ Dialog {
                                     onTextChanged: root.settings.name = text
                                 }
 
-                                Label { text: qsTranslate("RDM","Address:") }
+                                BetterLabel { text: qsTranslate("RDM","Address:") }
 
                                 AddressInput {
                                     id: connectionAddress
+                                    objectName: "rdm_connection_address_input"
                                     placeholderText: qsTranslate("RDM","redis-server host")
                                     host: root.settings ? root.settings.host : ""
                                     port: root.settings ? root.settings.port : 0
@@ -179,14 +187,36 @@ Dialog {
                                     onPortChanged: if (root.settings) root.settings.port = port
                                 }
 
-                                Label { text: qsTranslate("RDM","Auth:") }
+                                BetterLabel {
+                                    id: windowsLocalhostWarning
+                                    Layout.columnSpan: 2
+                                    text: qsTranslate("RDM", "For better network performance please use 127.0.0.1")
+                                    visible: !root.sshEnabled && !root.sslEnabled
+                                             && String(connectionAddress.host).toLowerCase() === "localhost"
+                                             && Qt.platform.os == "windows"
+
+                                }
+
+                                BetterLabel { text: qsTranslate("RDM","Password:") }
 
                                 PasswordInput {
                                     id: connectionAuth
+                                    objectName: "rdm_connection_auth_field"
                                     Layout.fillWidth: true
                                     placeholderText: qsTranslate("RDM","(Optional) redis-server authentication password")
                                     text: root.settings ? root.settings.auth : ""
                                     onTextChanged: root.settings.auth = text
+                                }
+
+                                BetterLabel { text: qsTranslate("RDM","Username:") }
+
+                                BetterTextField {
+                                    id: connectionUsername
+                                    objectName: "rdm_connection_username_field"
+                                    Layout.fillWidth: true
+                                    placeholderText: qsTranslate("RDM","(Optional) redis-server authentication username" + " (Redis >6.0)")
+                                    text: root.settings ? root.settings.username : ""
+                                    onTextChanged: if (root.settings) root.settings.username = text
                                 }
                             }
 
@@ -226,7 +256,7 @@ Dialog {
                                     columns: 2
                                     Layout.fillWidth: true
 
-                                    Label { text: qsTranslate("RDM","Public Key:") }
+                                    BetterLabel { text: qsTranslate("RDM","Public Key:") }
 
                                     FilePathInput {
                                         id: sslLocalCertPath
@@ -238,7 +268,7 @@ Dialog {
                                         onPathChanged: root.settings.sslLocalCertPath = path
                                     }
 
-                                    Label { text: qsTranslate("RDM", "Private Key") + ":" }
+                                    BetterLabel { text: qsTranslate("RDM", "Private Key") + ":" }
 
                                     FilePathInput {
                                         id: sslPrivateKeyPath
@@ -250,7 +280,7 @@ Dialog {
                                         onPathChanged: root.settings.sslPrivateKeyPath = path
                                     }
 
-                                    Label { text: qsTranslate("RDM","Authority:") }
+                                    BetterLabel { text: qsTranslate("RDM","Authority:") }
 
                                     FilePathInput {
                                         id: sslCaCertPath
@@ -262,7 +292,7 @@ Dialog {
                                         onPathChanged: root.settings.sslCaCertPath = path
                                     }
 
-                                    Label { text: qsTranslate("RDM","Enable strict mode:")}
+                                    BetterLabel { text: qsTranslate("RDM","Enable strict mode:")}
 
                                     BetterCheckbox {
                                         id: ignoreSSLErrors
@@ -302,7 +332,7 @@ Dialog {
                                     columns: 2
                                     Layout.fillWidth: true
 
-                                    Label { text: qsTranslate("RDM","SSH Address:") }
+                                    BetterLabel { text: qsTranslate("RDM","SSH Address:") }
 
                                     AddressInput {
                                         id: sshAddress
@@ -314,7 +344,7 @@ Dialog {
                                         onPortChanged: root.settings.sshPort = port
                                     }
 
-                                    Label { text: qsTranslate("RDM","SSH User:") }
+                                    BetterLabel { text: qsTranslate("RDM","SSH User:") }
 
                                     BetterTextField {
                                         id: sshUser
@@ -350,7 +380,7 @@ Dialog {
                                                 onPathChanged: root.settings.sshPrivateKey = path
                                             }
 
-                                            Label {
+                                            BetterLabel {
                                                 visible: PlatformUtils.isOSX()
                                                 Layout.fillWidth: true;
                                                 text: qsTranslate("RDM","<b>Tip:</b> Use <code>⌘ + Shift + .</code> to show hidden files and folders in dialog") }
@@ -407,7 +437,7 @@ Dialog {
                                 Layout.columnSpan: 2
                             }
 
-                            Label { text: qsTranslate("RDM","Default filter:") }
+                            BetterLabel { text: qsTranslate("RDM","Default filter:") }
 
                             BetterTextField
                             {
@@ -419,7 +449,7 @@ Dialog {
                                 onTextChanged: if (root.settings) { root.settings.keysPattern = text }
                             }
 
-                            Label { text: qsTranslate("RDM","Namespace Separator:") }
+                            BetterLabel { text: qsTranslate("RDM","Namespace Separator:") }
 
                             BetterTextField
                             {
@@ -431,22 +461,12 @@ Dialog {
                                 onTextChanged: if (root.settings) { root.settings.namespaceSeparator = text }
                             }
 
-                            Label { text: qsTranslate("RDM","Use server-side optimized keys loading (experimental):")}
-
-                            BetterCheckbox {
-                                id: luaKeysLoading
-                                Layout.fillWidth: true
-                                checked: root.settings ? (root.settings.luaKeysLoading / 1000.0) : true
-                                onCheckedChanged: if (root.settings) { root.settings.luaKeysLoading = checked }
-
-                            }
-
                             SettingsGroupTitle {
                                 text: qsTranslate("RDM","Timeouts & Limits")
                                 Layout.columnSpan: 2
                             }
 
-                            Label { text: qsTranslate("RDM","Connection Timeout (sec):") }
+                            BetterLabel { text: qsTranslate("RDM","Connection Timeout (sec):") }
 
                             BetterSpinBox {
                                 id: executeTimeout
@@ -459,7 +479,7 @@ Dialog {
                                 onValueChanged: if (root.settings) { root.settings.executeTimeout = value * 1000 }
                             }
 
-                            Label { text: qsTranslate("RDM","Execution Timeout (sec):")}
+                            BetterLabel { text: qsTranslate("RDM","Execution Timeout (sec):")}
 
                             BetterSpinBox {
                                 id: connectionTimeout
@@ -470,7 +490,7 @@ Dialog {
                                 onValueChanged: if (root.settings) { root.settings.connectionTimeout = value * 1000 }
                             }
 
-                            Label { text: qsTranslate("RDM","Databases discovery limit:") }
+                            BetterLabel { text: qsTranslate("RDM","Databases discovery limit:") }
 
                             BetterSpinBox {
                                 id: dbScanLimit
@@ -488,7 +508,7 @@ Dialog {
                                 Layout.columnSpan: 2
                             }
 
-                            Label { text: qsTranslate("RDM","Change host on cluster redirects:")}
+                            BetterLabel { text: qsTranslate("RDM","Change host on cluster redirects:")}
 
                             BetterCheckbox {
                                 id: overrideClusterHost
@@ -520,12 +540,9 @@ Dialog {
                         }
                     }
 
-                    ImageButton {
-                        Layout.preferredWidth: 25
-                        Layout.preferredHeight: 25
-                        imgSource: "qrc:/images/help.svg"
-                        imgHeight: 30
-                        imgWidth: 30
+                    BetterButton {
+                        iconSource: "qrc:/images/help.svg"
+                        text: qsTranslate("RDM","Quick Start Guide")
                         onClicked: Qt.openUrlExternally(root.quickStartGuideUrl)
                     }
 
@@ -543,7 +560,7 @@ Dialog {
                             sourceSize.height: 30
                             source: "qrc:/images/alert.svg"
                         }
-                        Label {
+                        BetterLabel {
                             text: qsTranslate("RDM","Invalid settings detected!")
                         }
                     }
@@ -584,7 +601,7 @@ Dialog {
                 MouseArea {
                     anchors.fill: parent
                 }
-            }            
+            }
             MessageDialog {
                 id: dialog_notification
                 objectName: "rdm_qml_connection_settings_error_dialog"

@@ -5,8 +5,13 @@
 #include <QClipboard>
 #include <QDateTime>
 #include <QDebug>
+#include <QDir>
+#include <QFile>
 #include <QFileInfo>
+#include <QScreen>
 #include <QtCharts/QDateTimeAxis>
+#include <QtConcurrent>
+#include <QUrl>
 
 #include "apputils.h"
 #include "qcompress.h"
@@ -28,6 +33,15 @@ long QmlUtils::binaryStringLength(const QVariant &value) {
   }
   QByteArray val = value.toByteArray();
   return val.size();
+}
+
+QVariant QmlUtils::b64toByteArray(const QVariant &value)
+{
+    if (!value.canConvert(QVariant::String)) {
+      return -1;
+    }
+
+    return QVariant(QByteArray::fromBase64(value.toString().toUtf8()));
 }
 
 QVariant QmlUtils::decompress(const QVariant &value) {
@@ -111,8 +125,20 @@ QVariant QmlUtils::toUtf(const QVariant &value) {
   return QVariant(result);
 }
 
+QString QmlUtils::getNativePath(const QString &path) {
+  return QDir::toNativeSeparators(path);
+}
+
 QString QmlUtils::getPathFromUrl(const QUrl &url) {
   return url.isLocalFile() ? url.toLocalFile() : url.path();
+}
+
+QString QmlUtils::getUrlFromPath(const QString &path) {
+  return QUrl::fromLocalFile(path).toString();
+}
+
+QString QmlUtils::getDir(const QString &path) {
+  return QFileInfo(path).absoluteDir().absolutePath();
 }
 
 bool QmlUtils::fileExists(const QString &path) {
@@ -126,6 +152,27 @@ void QmlUtils::copyToClipboard(const QString &text) {
 
   cb->clear();
   cb->setText(text);
+}
+
+bool QmlUtils::saveToFile(const QVariant &value, const QString &path) {
+  if (!value.canConvert(QVariant::ByteArray)) {
+    return false;
+  }
+
+  QtConcurrent::run([value, path]() {
+    QByteArray val = value.toByteArray();
+
+    QFile outputFile(path);
+    if (outputFile.open(QIODevice::WriteOnly)) {
+      QDataStream outStream(&outputFile);
+      outStream.writeRawData(val, val.size());
+      outputFile.close();
+      return true;
+    }
+    return false;
+  });
+
+  return true;
 }
 
 QtCharts::QDateTimeAxis *findDateTimeAxis(QtCharts::QXYSeries *series) {
@@ -215,4 +262,17 @@ QString QmlUtils::escapeHtmlEntities(const QString &t) {
 
 QString QmlUtils::htmlToPlainText(const QString &html) {
   return QTextDocumentFragment::fromHtml(html).toPlainText();
+}
+
+double QmlUtils::getScreenScaleFactor() {
+    return QApplication::primaryScreen()->logicalDotsPerInch() / 96;
+}
+
+bool QmlUtils::isAppStoreBuild()
+{
+#ifdef RDM_APPSTORE
+    return true;
+#else
+    return false;
+#endif
 }

@@ -17,10 +17,32 @@ Dialog {
 
     background: Rectangle {
         color: sysPalette.base
-        border.color: root.palette.dark
+        border.color: sysPalette.mid
+    }
+
+    header: BetterLabel {
+        text: root.title
+        visible: root.title
+        elide: Label.ElideRight
+        font.bold: true
+        padding: 12
+        background: Rectangle {
+            x: 1; y: 1
+            width: parent.width - 2
+            height: parent.height - 1
+            color: sysPalette.window
+        }
     }
 
     footer: BetterDialogButtonBox {
-        standardButtons: Dialog.Save | Dialog.Cancel
+        BetterButton {
+            text: qsTranslate("RDM","Save")
+            DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+        }
+
+        BetterButton {
+            text: qsTranslate("RDM","Cancel")
+            onClicked: root.close()
+        }
     }
 }

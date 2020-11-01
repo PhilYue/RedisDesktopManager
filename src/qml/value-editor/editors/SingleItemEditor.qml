@@ -11,6 +11,7 @@ AbstractEditor {
     anchors.fill: parent
 
     property bool active: false
+    property string keyType: ""
 
     MultilineEditor {
         id: textEditor
@@ -18,8 +19,16 @@ AbstractEditor {
         Layout.fillHeight: true
         value: ""
         enabled: root.active || root.state !== "edit"
-        showFormatters: root.state == "edit"
+        showToolBar: root.state == "edit"
+        showSaveBtn: root.state == "edit"
+        showFormatters: true
+        showOnlyRWformatters: root.state == "add" || root.state == "new"
         objectName: "rdm_key_value_field"
+
+        function validationRule(raw) {
+            if (root.keyType === "string") return true;
+            return qmlUtils.binaryStringLength(raw) > 0
+        }
     }
 
     function initEmpty() {

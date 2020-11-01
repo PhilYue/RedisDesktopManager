@@ -43,11 +43,11 @@ Rectangle {
 
         if (type == "error") {
             textArea.append("<span style='color: red; font-family: "
-                            + PlatformUtils.monospacedFontFamily() + "'>"
+                            + appSettings.valueEditorFont + "'>"
                             + qmlUtils.escapeHtmlEntities(text) + '</span>')
         } else {
             textArea.append("<pre style='color: white; font-family: "
-                            + PlatformUtils.monospacedFontFamily() + "'>"
+                            + appSettings.valueEditorFont + "'>"
                             + qmlUtils.escapeHtmlEntities(text) + '</pre>')
         }
 
@@ -86,6 +86,12 @@ Rectangle {
             if (event.key == Qt.Key_Backspace && cursorPosition <= commandStartPos) {
                 event.accepted = true
                 console.log("Block backspace")
+                return
+            }
+
+            if (event.key == Qt.Key_Left && cursorPosition <= commandStartPos) {
+                event.accepted = true
+                console.log("Block left arrow")
                 return
             }
 
@@ -166,7 +172,7 @@ Rectangle {
 
     ColumnLayout {
         height: 150
-        width: root.width * 0.6
+        width: root.width - x - 50
 
         x: textArea.cursorRectangle? textArea.cursorRectangle.x : 0
         y: textArea.cursorRectangle? textArea.cursorRectangle.y + 20 : 0

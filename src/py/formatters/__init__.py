@@ -15,17 +15,19 @@ ENABLED_FORMATTERS = {
 
 
 def get_formatters_list():
-    return list(ENABLED_FORMATTERS.keys())
+    return [(name, f.read_only)
+            for name, f in ENABLED_FORMATTERS.items()]
 
 
 def decode(name, value):
     formatter = ENABLED_FORMATTERS[name]
 
     error = ""
+    read_only = formatter.read_only
+    decode_format = formatter.decode_format
+
     try:
         result = formatter.decode(value)
-        read_only = formatter.read_only
-        decode_format = formatter.decode_format
 
         if type(result) is dict:
             result_dict = result

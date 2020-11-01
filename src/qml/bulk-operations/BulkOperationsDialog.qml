@@ -120,13 +120,13 @@ Dialog {
                 anchors.fill: parent
                 anchors.margins: 20
 
-                Label {
+                BetterLabel {
                     id: operationLabel
                     font.pixelSize: 20
                 }
 
                 Rectangle {
-                    color: "#e2e2e2"
+                    color: sysPalette.mid
                     Layout.preferredHeight: 1
                     Layout.fillWidth: true
                 }
@@ -141,25 +141,25 @@ Dialog {
 
                     Layout.fillWidth: true
 
-                    Label {
+                    BetterLabel {
                         text: qsTr("Redis Server:")
                         Layout.preferredWidth: 250
                         Layout.preferredHeight: 25
                     }
 
-                    Label {
+                    BetterLabel {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 25
                         text: bulkOperations.connectionName
                     }
 
-                    Label {
+                    BetterLabel {
                         text: qsTr("Database number:")
                         Layout.preferredWidth: 250
                         Layout.preferredHeight: 25
                     }
 
-                    Label {
+                    BetterLabel {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 25
                         text: bulkOperations.dbIndex
@@ -172,7 +172,7 @@ Dialog {
                         Layout.columnSpan: 2
                         Layout.fillWidth: true
 
-                        Label {
+                        BetterLabel {
                             id: rdbPathLabel
                             text: qsTr("Path to RDB file:")
                             Layout.preferredWidth: 250
@@ -194,7 +194,7 @@ Dialog {
                             }
                         }
 
-                        Label {
+                        BetterLabel {
                             id: rdbDbLabel
                             text: qsTr("Select DB in RDB file:")
                             Layout.preferredWidth: 250
@@ -215,14 +215,14 @@ Dialog {
                         }
                     }
 
-                    Label {
+                    BetterLabel {
                         text: root.operationName == "rdb_import"? qsTr("Import keys that match <b>regex</b>:") : qsTr("Key pattern:")
                         Layout.preferredWidth: 250
                     }
 
                     BetterTextField {
+                        objectName: "rdm_bulk_operations_dialog_key_pattern"
                         Layout.fillWidth: true
-
                         text: bulkOperations.keyPattern
                         onTextChanged: {
                             bulkOperations.keyPattern = text
@@ -236,17 +236,17 @@ Dialog {
                         Layout.fillWidth: true
                         Layout.columnSpan: 2
 
-                        Label {
+                        BetterLabel {
                             text: "New TTL value (seconds):"
                             Layout.preferredWidth: 250
                         }
 
                         BetterSpinBox {
                             id: ttlValue
+                            objectName: "rdm_bulk_operations_dialog_ttl_value"
 
                             Layout.fillWidth: true
 
-                            objectName: "rdm_bulk_operations_dialog_ttl_value"
 
                             from: -1
                             to: 10000000
@@ -261,18 +261,18 @@ Dialog {
                     Layout.fillWidth: true
                     visible: bulkOperations.multiConnectionOperation()
 
-                    Label {
+                    BetterLabel {
                         Layout.preferredWidth: 250
                         text: qsTr("Destination Redis Server:")
                     }
 
                     BetterComboBox {
-                        Layout.fillWidth: true
-
                         id: targetConnection
+                        objectName: "rdm_bulk_operations_dialog_connection_combobox"
+                        Layout.fillWidth: true
                     }
 
-                    Label {
+                    BetterLabel {
                         Layout.preferredWidth: 250
                         text: qsTr("Destination Redis Server Database Index:")
                     }
@@ -294,14 +294,14 @@ Dialog {
 
                         Layout.columnSpan: 2
 
-                        Label {
+                        BetterLabel {
                             text: "Replace existing keys in target db:"
                             Layout.preferredWidth: 250
                         }
 
                         BetterCheckbox {
                             id: replaceKeys
-
+                            objectName: "rdm_bulk_operations_dialog_replace_keys"
                             Layout.fillWidth: true
                         }
                     }
@@ -333,7 +333,7 @@ Dialog {
 
                     visible: false
 
-                    Label {
+                    BetterLabel {
                         text: root.operationName == "rdb_import"? qsTr("Matched keys:")  : qsTr("Affected keys:")
                     }
 
@@ -413,7 +413,7 @@ Dialog {
                         anchors.centerIn: parent;
 
                         BusyIndicator { running: true }
-                        Label {
+                        BetterLabel {
                             text: {
                                 if (bulkOperations.operationProgress > 0)
                                     return "Processed: " + bulkOperations.operationProgress

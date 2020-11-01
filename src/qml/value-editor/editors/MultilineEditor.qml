@@ -1,6 +1,7 @@
-import QtQuick 2.0
+import QtQuick 2.5
 import QtQuick.Controls 2.13
 import QtQuick.Layouts 1.1
+import QtQuick.Window 2.2
 import Qt.labs.settings 1.0
 import "../../common/"
 import "../../common/platformutils.js" as PlatformUtils
@@ -11,19 +12,23 @@ Item
 
     property bool enabled
     property string textColor
+    property int imgBtnWidth: PlatformUtils.isOSXRetina(Screen)? 18 : 22
+    property int imgBtnHeight: PlatformUtils.isOSXRetina(Screen)? 18 : 22
+    property bool showToolBar: false
+    property bool showSaveBtn: false
     property bool showFormatters: true
+    property bool showOnlyRWformatters: false
     property string fieldLabel: qsTranslate("RDM","Value") + ":"
     property bool isEdited: false
-    property var value
-    property int valueSizeLimit: 150000
+    property var value    
     property int valueCompression: 0
-    property string formatterSettingsCategory: "formatters_value"    
+    property string formatterSettingsCategory: "formatters_value"
     property alias readOnly: textView.readOnly
     property string _jsFormatterStyles: {
         return "font-size: "
                 + appSettings.valueEditorFontSize
-                + "px; font-family: "
-                + PlatformUtils.monospacedFontFamily()
+                + "pt; font-family: "
+                + appSettings.valueEditorFont
     }
     property var _jsFormatterColorMap: {
         if (sysPalette.base.hslLightness < 0.4) {
@@ -49,7 +54,7 @@ Item
         // init editor with empty model
         textView.model = qmlUtils.wrapLargeText("")
         textView.readOnly = false
-        textView.textFormat = TextEdit.PlainText            
+        textView.textFormat = TextEdit.PlainText
     }
 
     function validationRule(raw)
@@ -85,32 +90,30 @@ Item
         }
     }
 
-    function loadRawValue(callback) {                
-        if (formatterSelector.visible) {
+    function loadRawValue(callback) {
+        function process(formattedValue) {
+            var formatter = valueFormattersModel.get(formatterSelector.currentIndex)
 
-            function process(formattedValue) {
-                var formatter = formatterSelector.model.get(formatterSelector.currentIndex)
+             formatter.getRaw(formattedValue, function (error, raw) {
+                 if (formatter.type === "external") {
+                    root.value = compress(qmlUtils.b64toByteArray(raw))
+                 } else {
+                    root.value = compress(raw)
+                 }
+                 return callback(error, root.value)
+             })
+        }
 
-                 formatter.getRaw(formattedValue, function (error, raw) {
-                     root.value = compress(raw)
-                     return callback(error, compress(raw))
-                 })
-            }
+        if (textView.format === "json") {
+            formatterSelector.model.getJSONFormatter().getRaw(textView.model.getText(), function (jsonError, plainText) {
+                if (jsonError) {
+                    return callback(jsonError, "")
+                }
 
-            if (textView.format === "json") {
-                formatterSelector.model.getJSONFormatter().getRaw(textView.model.getText(), function (jsonError, plainText) {
-                    if (jsonError) {
-                        return callback(jsonError, "")
-                    }
-
-                    process(plainText)
-                })
-            } else {
-                process(textView.model.getText())
-            }
+                process(plainText)
+            })
         } else {
-            root.value = compress(textView.model.getText())
-            return callback("", root.value)
+            process(textView.model.getText())
         }
     }
 
@@ -135,7 +138,7 @@ Item
         var isBin = qmlUtils.isBinaryString(root.value)
         binaryFlag.visible = isBin
 
-        if (qmlUtils.binaryStringLength(root.value) > valueSizeLimit) {
+        if (qmlUtils.binaryStringLength(root.value) > appSettings.valueSizeLimit) {
             root.showFormatters = false
             formatterSelector.currentIndex = formatterSelector.model.getDefaultFormatter(isBin)
             guessFormatter = false
@@ -157,6 +160,12 @@ Item
             })
         } else {
             _loadFormatter(isBin)
+        }
+
+        if (isBin && qmlUtils.binaryStringLength(root.value) > appSettings.valueSizeLimit) {
+            largeValueDialog.visible = true
+        } else {
+            largeValueDialog.visible = false
         }
     }
 
@@ -273,7 +282,16 @@ Item
                 textView.readOnly = isReadOnly
                 root.isEdited = false
                 uiBlocker.visible = false
-                notification.showError(error || qsTranslate("RDM","Unknown formatter error (Empty response)"))
+
+                var details
+                if (error.length > 200) {
+                    details = error
+                    error = qsTranslate("RDM","Formatting error")
+                } else {
+                    details = ""
+                }
+
+                notification.showError(error || qsTranslate("RDM","Unknown formatter error (Empty response)"), details)
                 return
             }
 
@@ -285,14 +303,14 @@ Item
         }
     }
 
-
     ColumnLayout {
         anchors.fill: parent
 
-        RowLayout{
+        RowLayout {
             Layout.fillWidth: true
+            spacing: 5
 
-            Label { text: root.fieldLabel }
+            BetterLabel { text: root.fieldLabel }
             TextEdit {
                 Layout.preferredWidth: 150
                 text: qsTranslate("RDM", "Size: ") + qmlUtils.humanSize(qmlUtils.binaryStringLength(value));
@@ -300,22 +318,16 @@ Item
                 selectByMouse: true
                 color: "#ccc"
             }
-            Label { id: binaryFlag; text: qsTranslate("RDM","[Binary]"); visible: false; color: "green"; }
-            Label { text: qsTranslate("RDM"," [Compressed: ") + qmlUtils.compressionAlgName(root.valueCompression) + "]"; visible: root.valueCompression > 0; color: "red"; }
+            BetterLabel { id: binaryFlag; text: qsTranslate("RDM","[Binary]"); visible: false; color: "green"; }
+            BetterLabel {
+                objectName: "rdm_value_editor_compressed_value_label"
+                text: qsTranslate("RDM"," [Compressed: ") + qmlUtils.compressionAlgName(root.valueCompression) + "]";
+                visible: root.valueCompression > 0;
+                color: "red";
+            }
             Item { Layout.fillWidth: true }
 
-            ImageButton {
-                iconSource: "qrc:/images/copy.svg"
-                tooltip: qsTranslate("RDM","Copy to Clipboard")
-
-                onClicked: {
-                    if (textView.model) {
-                        qmlUtils.copyToClipboard(textView.model.getText())
-                    }
-                }
-            }
-
-            Label { visible: showFormatters; text: qsTranslate("RDM","View as:") }
+            BetterLabel { visible: showFormatters; text: qsTranslate("RDM","View as:") }
 
             Settings {
                 id: defaultFormatterSettings
@@ -325,7 +337,7 @@ Item
 
             BetterComboBox {
                 id: formatterSelector
-                visible: showFormatters
+                visible: showFormatters && !showOnlyRWformatters
                 width: 200
                 model: valueFormattersModel
                 textRole: "name"
@@ -337,7 +349,165 @@ Item
                 }
             }
 
-            Label { visible: !showFormatters && qmlUtils.binaryStringLength(root.value) > valueSizeLimit; text: qsTranslate("RDM","Large value (>150kB). Formatters are not available."); color: "red"; }
+            BetterComboBox {
+                id: rwFormatterSelector
+                visible: showFormatters && showOnlyRWformatters
+                width: 200
+                model: valueFormattersModel.rwFormatters
+                textRole: "name"
+                objectName: "rdm_value_editor_rw_formatter_combobox"
+
+                onActivated: {
+                    formatterSelector.currentIndex = valueFormattersModel.getFormatterIndex(currentText);
+                }
+            }
+
+            BetterLabel {
+                visible: !showFormatters && qmlUtils.binaryStringLength(root.value) > appSettings.valueSizeLimit
+                text: qsTranslate("RDM","Large value (>150kB). Formatters are not available.")
+                color: "red"
+            }
+
+            RowLayout {
+                id: valueEditorToolBar
+                Layout.preferredWidth: isMultiRow ? 200 : 208
+                Layout.maximumWidth: isMultiRow ? 200 : 208
+
+                visible: showToolBar                
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 98
+
+                    ImageButton {
+                        iconSource: "qrc:/images/add.svg"
+                        implicitWidth: imgBtnWidth
+                        implicitHeight: imgBtnHeight
+                        imgWidth: imgBtnWidth
+                        imgHeight: imgBtnHeight
+
+                        Layout.alignment: Qt.AlignHCenter
+
+                        tooltip: qsTranslate("RDM","Add Element to HLL");
+                        visible: keyType === "hyperloglog"
+
+                        onClicked: {
+                            addRowDialog.open()
+                        }
+                    }
+
+                    ImageButton {
+                        id: copyValueToClipboardBtn
+                        iconSource: "qrc:/images/copy.svg"
+                        implicitWidth: imgBtnWidth
+                        implicitHeight: imgBtnHeight
+                        imgWidth: imgBtnWidth
+                        imgHeight: imgBtnHeight
+
+                        Layout.alignment: Qt.AlignHCenter
+
+                        tooltip: qsTranslate("RDM","Copy to Clipboard")
+                        enabled: root.value !== ""
+
+                        onClicked: copyValue()
+
+                        function copyValue() {                            
+                            if (value) {
+                                qmlUtils.copyToClipboard(value)
+                            }
+                        }
+                    }
+
+                    SaveToFileButton {
+                        id: saveAsBtn
+                        objectName: "rdm_save_value_to_file_btn"
+
+                        Layout.alignment: Qt.AlignHCenter
+
+                        implicitWidth: imgBtnWidth
+                        implicitHeight: imgBtnHeight
+                        imgWidth: imgBtnWidth
+                        imgHeight: imgBtnHeight
+
+                        enabled: root.value !== ""
+                    }
+                }
+
+                BetterButton {
+                    id: saveBtn
+                    objectName: "rdm_value_editor_save_btn"
+
+                    iconSource: "qrc:/images/save.svg"
+                    implicitWidth: isMultiRow ? 100 : 105
+
+                    text: qsTranslate("RDM","Save")
+                    tooltip: qsTranslate("RDM","Save Changes") + " (" + shortcutText + ")"
+                    enabled: !showOnlyRWformatters && root.value !== "" && valueEditor.item.isEdited() && keyType != "stream"
+                    visible: showSaveBtn
+
+                    property string shortcutText: ""
+
+                    onClicked: saveChanges()
+
+                    function saveChanges() {
+                        if (!valueEditor.item || !valueEditor.item.isEdited()) {
+                            return
+                        }
+
+                        valueEditor.item.validateValue(function (result) {
+                            if (!result)
+                                return;
+
+                            var value = valueEditor.item.getValue()
+
+                            saveBtnTimer.start()
+                            keyTab.keyModel.updateRow(valueEditor.currentRow, value)
+                        })
+                    }
+
+                    states: [
+                        State {
+                            name: "saving"
+
+                            PropertyChanges {
+                                target: saveBtn
+                                iconSource: "qrc:/images/wait.svg"
+                                enabled: false
+                            }
+                        }
+                    ]
+
+                    Connections {
+                        target: keyTab.keyModel ? keyTab.keyModel : null
+
+                        onValueUpdated: {
+                            root.isEdited = false
+                            saveBtnTimer.resetSaveBtn()
+                        }
+
+                        onError: saveBtnTimer.resetSaveBtn()
+                    }
+
+                    Timer {
+                        id: saveBtnTimer
+                        interval: 500
+                        repeat: true
+                        triggeredOnStart: true
+                        onTriggered: saveBtn.state = "saving"
+
+                        function resetSaveBtn() {
+                            saveBtnTimer.stop()
+                            saveBtn.state = ""
+                        }
+                    }
+                }
+
+                Item {
+                    width: 100
+                    visible: !showSaveBtn && keyType == "hash"
+                }
+            }
+
         }
 
         Rectangle {
@@ -356,6 +526,9 @@ Item
                 anchors.margins: 5
 
                 ScrollBar.vertical.policy: ScrollBar.AlwaysOn
+                ScrollBar.vertical.minimumSize: 0.05
+
+                enabled: !(qmlUtils.isBinaryString(root.value) && qmlUtils.binaryStringLength(root.value) > appSettings.valueSizeLimit)
 
                 ListView {
                     id: textView
@@ -377,14 +550,38 @@ Item
                                 objectName: "rdm_key_multiline_text_field_" + index
 
                                 enabled: root.enabled
-                                text: value
+                                text: qmlUtils.isBinaryString(root.value) && qmlUtils.binaryStringLength(root.value) > appSettings.valueSizeLimit ?
+                                          qmlUtils.printable(value, false, 50000) : value;  // Show first 50KB to fit chunkSize
 
                                 textFormat: textView.textFormat
                                 readOnly: textView.readOnly
 
-                                Keys.onReleased: {
+                                onTextChanged: {
                                     root.isEdited = true
                                     textView.model && textView.model.setTextChunk(index, textAreaPart.text)
+                                }
+
+                                Keys.forwardTo: [saveShortcut, saveAsShortcut]
+
+                            }
+
+                            Shortcut {
+                                id: saveShortcut
+                                sequence: StandardKey.Save
+                                onActivated: saveBtn.saveChanges()
+
+                                Component.onCompleted: {
+                                    saveBtn.shortcutText = saveShortcut.nativeText
+                                }
+                            }
+
+                            Shortcut {
+                                id: saveAsShortcut
+                                sequence: StandardKey.SaveAs
+                                onActivated: saveAsBtn.saveToFile()
+
+                                Component.onCompleted: {
+                                    saveAsBtn.shortcutText = saveAsShortcut.nativeText
                                 }
                             }
                         }
@@ -392,12 +589,35 @@ Item
                 }
         }
 
-        Label {
+        BetterLabel {
             id: validationError
             color: "red"
             visible: false
         }
 
+    }
+
+    BetterDialog {
+        id: largeValueDialog
+        title: qsTranslate("RDM","Binary value is too large to display")
+        visible: false
+        footer: BetterDialogButtonBox {
+            BetterButton {
+                text: qsTranslate("RDM","OK")
+                onClicked: largeValueDialog.close()
+            }
+        }
+
+        RowLayout {
+            Text {
+                color: sysPalette.text
+                text: qsTranslate("RDM","Save value to file: ")
+            }
+
+            SaveToFileButton {
+                objectName: "rdm_save_large_value_to_file_dialog_btn"
+            }
+        }
     }
 
     Rectangle {
